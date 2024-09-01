@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Drive</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-900 text-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div class="container mx-auto p-4 sm:p-6 md:p-8 bg-gray-800 shadow-lg rounded-lg max-w-md w-full">
+        <h1 class="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 text-center text-blue-400">Upload Your File</h1>
+        <form id="uploadForm" class="mb-6 sm:mb-8">
+            <div class="mb-4">
+                <input type="file" id="fileInput"
+                    class="hidden"
+                    onchange="document.getElementById('fileLabel').textContent = this.files[0] ? (this.files[0].name.length > 20 ? this.files[0].name.substring(0, 20) + '...' : this.files[0].name) : 'Choose a file'">
+                <label for="fileInput" id="fileLabel"
+                    class="block w-full bg-blue-600 text-white text-center font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out cursor-pointer text-sm sm:text-base truncate">
+                    Choose a file
+                </label>
+            </div>
+            <button type="submit"
+                class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out transform hover:scale-105 text-sm sm:text-base">
+                Upload File
+            </button>
+        </form>
+
+        <h2 class="text-xl sm:text-2xl font-semibold mb-3 sm:mb-4 text-blue-400">Uploaded Files</h2>
+        <ul id="fileList" class="space-y-2"></ul>
+    </div>
+
+    <script>
+        const uploadForm = document.getElementById('uploadForm');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const MAX_FILE_SIZE_MB = 10;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const storedFiles = JSON.parse(localStorage.getItem('files')) || [];
+            storedFiles.forEach(({ fileId, fileName }) => addFileToList(fileId, fileName));
+        });
+
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const file = fileInput.files[0];
+            if (!file) return alert('Please select a file to upload.');
+
+            if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+                return alert('File size exceeds 10 MB limit.');
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const result = await response.json();
+                if (result.fileId && result.fileName) {
+                    saveFile(result.fileId, result.fileName);
+                    addFileToList(result.fileId, result.fileName);
+                }
+            } catch (error) {
+                console.error('Error uploading file:', error);
+            }
+        });
+
+        function saveFile(fileId, fileName) {
+            const files = JSON.parse(localStorage.getItem('files')) || [];
+            files.push({ fileId, fileName });
+            localStorage.setItem('files', JSON.stringify(files));
+        }
+
+        function addFileToList(fileId, fileName) {
+            const listItem = document.createElement('li');
+            listItem.className = 'bg-gray-700 p-2 sm:p-3 rounded-md flex items-center justify-between';
+
+            const fileInfoSpan = document.createElement('span');
+            fileInfoSpan.textContent = fileName.length > 20 ? fileName.substring(0, 20) + '...' : fileName;
+            fileInfoSpan.className = 'text-xs sm:text-sm text-gray-300 truncate mr-2';
+
+            const downloadBtn = document.createElement('button');
+            downloadBtn.textContent = 'Download';
+            downloadBtn.className = 'bg-green-600 text-white px-2 sm:px-3 py-1 rounded hover:bg-green-700 transition duration-300 ease-in-out text-xs sm:text-sm whitespace-nowrap';
+            downloadBtn.addEventListener('click', () => downloadFile(fileId));
+
+            listItem.appendChild(fileInfoSpan);
+            listItem.appendChild(downloadBtn);
+            fileList.appendChild(listItem);
+        }
+
+        async function downloadFile(fileId) {
+            try {
+                const response = await fetch(`/share/${fileId}`);
+                const result = await response.json();
+                if (result.webContentLink) {
+                    window.location.href = result.webContentLink;
+                }
+            } catch (error) {
+                console.error('Error downloading file:', error);
+            }
+        }
+    </script>
+</body>
+
+</html>
